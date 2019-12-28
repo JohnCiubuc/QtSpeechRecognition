@@ -119,11 +119,13 @@ AudioInfo::AudioInfo(const QAudioFormat & format)
 void AudioInfo::start()
 {
   open(QIODevice::WriteOnly);
+  bIsListening = true;
 }
 
 void AudioInfo::stop()
 {
   close();
+  bIsListening = false;
 }
 
 qint64 AudioInfo::readData(char * data, qint64 maxlen)

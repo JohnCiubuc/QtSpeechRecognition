@@ -62,7 +62,6 @@ private:
 
   bool bListening = false;
   bool bFinalHypothesis = false;
-  bool bAllowListening = true;
   bool bStartUtt = false;
 
   float fMicThreshold;

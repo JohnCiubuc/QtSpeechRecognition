@@ -29,6 +29,7 @@ QtSpeechRecognition::~QtSpeechRecognition()
 
 void QtSpeechRecognition::loadKeywords(QStringList list)
 {
+  // TODO: change threshold away from 1e-1?
   b_ps_utt(false);                          // then mark the end of the utterance
   ad_stop_rec(AudioRecorder);
   ps_unset_search(SphinxDecoder, "default");
@@ -43,14 +44,12 @@ void QtSpeechRecognition::loadKeywords(QStringList list)
 
 void QtSpeechRecognition::startListening()
 {
-  bAllowListening = true;
   m_audioInfo->start();
   m_audioInput->start(m_audioInfo);
 }
 
 void QtSpeechRecognition::stopListening()
 {
-  bAllowListening = false;
   m_audioInfo->stop();
   m_audioInput->stop();
 }
@@ -164,7 +163,7 @@ void QtSpeechRecognition::initializeAudio(const QAudioDeviceInfo & deviceInfo)
 
 void QtSpeechRecognition::listenMicrophoneAudioLevel()
 {
-  if(!bAllowListening) return;
+  if(!m_audioInfo->isListening()) return;
 
   // Starts listening to Audio if Mic Level is greater than threshold
   // Generally User's voice is louder than ambient level.
