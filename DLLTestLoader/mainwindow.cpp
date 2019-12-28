@@ -6,7 +6,7 @@ MainWindow::MainWindow(QWidget * parent)
   , ui(new Ui::MainWindow)
 {
   ui->setupUi(this);
-  QtSR = new QtSpeechRecognition(0);
+  QtSR = new QtSpeechRecognition(0, QDir::currentPath().append("/model"));
   connect(QtSR, &QtSpeechRecognition::firstHypothesis, this,
           [ = ]( const QString hypothesis )
   {

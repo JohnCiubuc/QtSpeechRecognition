@@ -24,7 +24,7 @@ signals:
   void firstHypothesis(QString);
   void finalHypothesis(QString);
 public:
-  QtSpeechRecognition(float micThreshold);
+  QtSpeechRecognition(float micThreshold, QString modelDirectory);
   ~QtSpeechRecognition();
 public slots:
   void loadKeywords(QStringList list);

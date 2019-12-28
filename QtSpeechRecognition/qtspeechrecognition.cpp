@@ -1,17 +1,16 @@
 #include "qtspeechrecognition.h"
 #define db qDebug() << this <<
-QtSpeechRecognition::QtSpeechRecognition(float micThreshold)
+QtSpeechRecognition::QtSpeechRecognition(float micThreshold, QString modelDirectory)
 {
   fMicThreshold = micThreshold;
   MicrophoneTimer = new QTimer(this);
   connect(MicrophoneTimer, &QTimer::timeout, this, &QtSpeechRecognition::decodeMicrophone);
   MicrophoneListener = new QTimer(this);
   connect(MicrophoneListener, &QTimer::timeout, this, &QtSpeechRecognition::decodeSpeech);
-  QString MODELDIR = QDir::currentPath().append("/model");
   Config = cmd_ln_init(NULL, ps_args(), TRUE,
-                       "-hmm", (MODELDIR + "/en-us/en-us").toLocal8Bit().data(),
-                       "-lm", (MODELDIR + "/en-us/en-us.lm.bin").toLocal8Bit().data(),
-                       "-dict", (MODELDIR + "/en-us/cmudict-en-us.dict").toLocal8Bit().data(),
+                       "-hmm", (modelDirectory + "/en-us/en-us").toLocal8Bit().data(),
+                       "-lm", (modelDirectory + "/en-us/en-us.lm.bin").toLocal8Bit().data(),
+                       "-dict", (modelDirectory + "/en-us/cmudict-en-us.dict").toLocal8Bit().data(),
 //                       "-logfn", "/dev/null",                                      // suppress log info from being sent to screen
                        NULL);
   SphinxDecoder = ps_init(Config);
@@ -40,6 +39,7 @@ void QtSpeechRecognition::loadKeywords(QStringList list)
   ps_unset_search(SphinxDecoder, "default");
   QString phrases = list.join("/1e-1/\n");
   phrases.append("/1e-1/");
+  phrases = phrases.toLower();
   // Requires pocketsphinx_qt.patch applied in pocketsphinx directory, and recompiled
   // If patch is not being used, use ps_set_kws instead. Write keywords to file and read
   // from file.
