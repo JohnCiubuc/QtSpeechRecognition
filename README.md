@@ -42,3 +42,7 @@ The `pocketsphinx` folder contains a `model` folder, containing the models neede
 Drop them in the same directory as the `DLLTestLoader` application (I should've renamed it to `Demo` Instead). It should load the model just fine.
 
 If the model doesn't load, check the path to laod the model when initializing the speech recognition library.
+
+#### Including CMUSphinx with QtSpeechRecognition
+
+Simple solution for including CMUSphinx files for compile is to look in the  `QtSpeechRecognition`  folder. There's two empty folders here with the names `pocketsphinx` and `sphinxbase`. Drop your respective `pocketsphinx` and `sphinxbase` cloned repos in the same place and the default links will work just fine
