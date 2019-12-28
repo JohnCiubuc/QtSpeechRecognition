@@ -1,0 +1,151 @@
+diff -Naru ./include/ps_search.h ../New/include/ps_search.h
+--- ./include/ps_search.h	2019-12-27 18:52:52.655089507 -0700
++++ ../New/include/ps_search.h	2019-12-27 18:47:56.296429000 -0700
+@@ -261,6 +261,8 @@
+  */
+ POCKETSPHINX_EXPORT 
+ int ps_set_kws(ps_decoder_t *ps, const char *name, const char *keyfile);
++POCKETSPHINX_EXPORT
++int ps_set_kws_mem(ps_decoder_t *ps, const char *name, const char *keystream);
+ 
+ /**
+  * Adds new keyphrase to spot
+diff -Naru ./src/libpocketsphinx/kws_search.c ../New/src/libpocketsphinx/kws_search.c
+--- ./src/libpocketsphinx/kws_search.c	2019-12-27 18:58:42.115146546 -0700
++++ ../New/src/libpocketsphinx/kws_search.c	2019-12-27 20:01:58.520593000 -0700
+@@ -362,6 +362,7 @@
+         }
+ 
+         keyphrase->word = ckd_salloc(line);
++        E_INFO("KWS Original Add Word %f\n", keyphrase->word);
+ 
+         kwss->keyphrases = glist_add_ptr(kwss->keyphrases, keyphrase);
+     }
+@@ -370,10 +371,68 @@
+     return 0;
+ }
+ 
++static int
++kws_search_read_list_from_mem(kws_search_t *kwss, const char* keystream)
++{
++    char *line;
++
++    kwss->keyphrases = NULL;
++
++    // There's definitely a far more efficient way of doing this
++    // Without including anything, but can't think of it right now
++    int iterator = 0;
++    int buf_size = 0;
++    int iterator_start=0;
++    while(1)
++    {
++        if(keystream[iterator] == '\n' || keystream[iterator] == '\0')
++        {
++            size_t begin, end;
++            kws_keyphrase_t *keyphrase;
++            keyphrase = ckd_calloc(1, sizeof(kws_keyphrase_t));
++            line = malloc(sizeof(char*) * (buf_size+1));
++            for(int i = 0; i < buf_size+1; ++i)
++                line[i] = keystream[iterator_start+i];
++
++            line[buf_size] = '\0';
++            E_INFO("Loading KWS FROM MEM: %s\n", line);
++            iterator_start = iterator+1;
++            buf_size = 0;
++            end = strlen(line) - 1;
++            begin = end - 1;
++            if (line[end] == '/') {
++                while (line[begin] != '/' && begin > 0)
++                    begin--;
++                line[end] = 0;
++                line[begin] = 0;
++                keyphrase->threshold = (int32) logmath_log(kwss->base.acmod->lmath, atof_c(line + begin + 1))
++                                              >> SENSCR_SHIFT;
++
++                E_INFO("KWS LOG MATH %f\n", atof_c(line + begin + 1));
++            } else {
++                keyphrase->threshold = kwss->def_threshold;
++                E_INFO("KWS def Threshold %f\n", kwss->def_threshold);
++
++            }
++
++            keyphrase->word = ckd_salloc(line);
++            E_INFO("KWS Add Word %f\n", keyphrase->word);
++
++            kwss->keyphrases = glist_add_ptr(kwss->keyphrases, keyphrase);
++            if(keystream[iterator] == '\0') break;
++        }
++        iterator++;
++        buf_size++;
++    }
++
++    return 0;
++}
++
+ ps_search_t *
+ kws_search_init(const char *name,
+                 const char *keyphrase,
+                 const char *keyfile,
++                const char *keystream,
+                 cmd_ln_t * config,
+                 acmod_t * acmod, dict_t * dict, dict2pid_t * d2p)
+ {
+@@ -411,12 +470,19 @@
+ 	    kws_search_free(ps_search_base(kwss));
+ 	    return NULL;
+ 	}
+-    } else {
++    } else if(keyphrase) {
+         kws_keyphrase_t *k = ckd_calloc(1, sizeof(kws_keyphrase_t));
+         k->threshold = kwss->def_threshold;
+         k->word = ckd_salloc(keyphrase);
+         kwss->keyphrases = glist_add_ptr(NULL, k);
+     }
++    else {
++        if (kws_search_read_list_from_mem(kwss, keystream) < 0) {
++            E_ERROR("Failed to create kws search\n");
++            kws_search_free(ps_search_base(kwss));
++            return NULL;
++        }
++    }
+ 
+     /* Reinit for provided keyphrase */
+     if (kws_search_reinit(ps_search_base(kwss),
+@@ -431,6 +497,7 @@
+     return ps_search_base(kwss);
+ }
+ 
++
+ void
+ kws_search_free(ps_search_t * search)
+ {
+diff -Naru ./src/libpocketsphinx/pocketsphinx.c ../New/src/libpocketsphinx/pocketsphinx.c
+--- ./src/libpocketsphinx/pocketsphinx.c	2019-12-27 19:03:18.382554210 -0700
++++ ../New/src/libpocketsphinx/pocketsphinx.c	2019-12-27 18:37:59.366010000 -0700
+@@ -665,15 +665,24 @@
+ ps_set_kws(ps_decoder_t *ps, const char *name, const char *keyfile)
+ {
+     ps_search_t *search;
+-    search = kws_search_init(name, NULL, keyfile, ps->config, ps->acmod, ps->dict, ps->d2p);
++    search = kws_search_init(name, NULL, keyfile, NULL, ps->config, ps->acmod, ps->dict, ps->d2p);
+     return set_search_internal(ps, search);
+ }
+ 
+ int
++ps_set_kws_mem(ps_decoder_t *ps, const char *name, const char *keystream)
++{
++    ps_search_t *search;
++    search = kws_search_init(name, NULL, NULL, keystream, ps->config, ps->acmod, ps->dict, ps->d2p);
++    return set_search_internal(ps, search);
++}
++
++
++int
+ ps_set_keyphrase(ps_decoder_t *ps, const char *name, const char *keyphrase)
+ {
+     ps_search_t *search;
+-    search = kws_search_init(name, keyphrase, NULL, ps->config, ps->acmod, ps->dict, ps->d2p);
++    search = kws_search_init(name, keyphrase, NULL,NULL,ps->config, ps->acmod, ps->dict, ps->d2p);
+     return set_search_internal(ps, search);
+ }
+ 

@@ -18,28 +18,6 @@ QtSpeechRecognition::QtSpeechRecognition(float micThreshold)
   }
 
   SphinxDecoder = ps_init(Config);
-//  SphinxDecoder->ps_set_ke
-//  db ps_set_jsgf_file(SphinxDecoder, "test", "/hdd/Sync Drive/Programming Projects/build-QtSpeechRecognition-GCC_64-Release/DLLTestLoader/basic_command");
-//  QBuffer buffer;
-//  buffer.open(QBuffer::ReadWrite);
-//  QFile myFile(&buffer);
-//  QFile myFile("output.raw");
-//  myFile.open(QIODevice::WriteOnly);
-//  QTextStream os(&myFile);
-//  os << "open menu /1e-1/\nselect next target /1e-1/\nactivate jump /1e-1/\nup /1e-1/";
-//  myFile.close();
-//  int fileHandle = myFile.handle();
-//  FILE * fh = fdopen(fileHandle, "rb");
-//  db ps_set_kws(SphinxDecoder, "test", "output.raw");
-//  myFile.setFileName("output2.raw");
-//  myFile.open(QIODevice::WriteOnly);
-//  myFile.resize(0);
-//  os.setDevice(&myFile);
-//  os << "open menu/1e-1/\nselect next target/1e-1/\nactivate jump /1e-1/\nup /1e-1/\ntarget left /1e-1/\ntarget right /1e-1/\nshut down now /1e-1/";
-//  db ps_set_kws(SphinxDecoder, "test2", "output2.raw");
-//  ps_set_keyphrase(SphinxDecoder, "test", "open menu /1e-1/\nselect next target /1e-1/\nactivate jump /1e-1/\nup /1e-1/");
-//  ps_set_keyphrase(SphinxDecoder, "test", "say hello to my friend /1e-30/");
-//  db ps_set_search(SphinxDecoder, "test");
 
   if (SphinxDecoder == NULL)
   {
@@ -48,18 +26,13 @@ QtSpeechRecognition::QtSpeechRecognition(float micThreshold)
   }
 
   // Platform Specific!!
-//  AudioRecorder =  ad_open_dev("sysdefault", (int) cmd_ln_float32_r(Config, "-samprate")); // open default microphone at default samplerate
-//  db "before";
   AudioRecorder = ad_open();
-//  db "after";
   MicrophoneTimer = new QTimer(this);
   connect(MicrophoneTimer, &QTimer::timeout, this, &QtSpeechRecognition::decodeMicrophone);
   MicrophoneListener = new QTimer(this);
   connect(MicrophoneListener, &QTimer::timeout, this, &QtSpeechRecognition::decodeSpeech);
   // Initiliaze Audio / Mic to determine Mic Levels
   initializeAudio(QAudioDeviceInfo::defaultInputDevice());
-  // Start Listening
-//  decodeMicrophone();
 }
 
 QtSpeechRecognition::~QtSpeechRecognition()
@@ -93,6 +66,11 @@ void QtSpeechRecognition::loadKeywords(QStringList list)
   db ad_stop_rec(AudioRecorder);
   db ps_unset_search(SphinxDecoder, "default");
   // Temporary solution
+  // Temp fix 1: Write to tmp directory instead
+  // Perma fix later: change ps_set_kws in pocketsphinx to accept buffers/lists
+  char * test = "open menu/1e-1/\nclose menu/1e-1/";
+  db ps_set_kws_mem(SphinxDecoder, "default", test);
+//  return;
   QFile myFile("output.raw");
   myFile.open(QIODevice::WriteOnly);
   QTextStream os(&myFile);
@@ -104,7 +82,8 @@ void QtSpeechRecognition::loadKeywords(QStringList list)
   myFile.close();
   //  int fileHandle = myFile.handle();
   //  FILE * fh = fdopen(fileHandle, "rb");
-  db ps_set_kws(SphinxDecoder, "default", "output.raw");
+//  db ps_set_kws(SphinxDecoder, "default", "output.raw");
+  db ps_set_kws_mem(SphinxDecoder, "default", test);
   db ps_set_search(SphinxDecoder, "default");
 }
 
@@ -258,11 +237,8 @@ void QtSpeechRecognition::initializeAudio(const QAudioDeviceInfo & deviceInfo)
   }
 
   m_audioInfo = new AudioInfo(format);
-//  m_audioInfo.reset(new AudioInfo(format));
   connect(m_audioInfo, &AudioInfo::update, this, &QtSpeechRecognition::listenMicrophoneAudioLevel);
   m_audioInput.reset(new QAudioInput(deviceInfo, format));
-//  m_audioInfo->start();
-//  m_audioInput->start(m_audioInfo);
 }
 
 void QtSpeechRecognition::listenMicrophoneAudioLevel()
@@ -288,7 +264,8 @@ void QtSpeechRecognition::listenMicrophoneAudioLevel()
     }
   }
 
-//  db "Audio Level: " << m_audioInfo->level();
+  // Starts listening to Audio if Mic Level is greater than threshold
+  // Generally User's voice is louder than ambient level.
   if(m_audioInfo->level() > fMicThreshold && !bStartUtt)
     decodeMicrophone();
 }
