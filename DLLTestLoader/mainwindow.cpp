@@ -6,15 +6,14 @@ MainWindow::MainWindow(QWidget * parent)
   , ui(new Ui::MainWindow)
 {
   ui->setupUi(this);
-  CSR = new QtSpeechRecognition(0);
-  connect(CSR, &QtSpeechRecognition::debugMicLevel, this, &MainWindow::debugMicLevel);
-  QStringList a;
-  a << "open menu";
-  a << "reload my gun";
-  a << "show inventory";
-  a << "quick save";
-  CSR->loadKeywords(a);
-  CSR->startListening();
+  QtSR = new QtSpeechRecognition(0);
+  connect(QtSR, &QtSpeechRecognition::firstHypothesis, this,
+          [ = ]( const QString hypothesis )
+  {
+    ui->label_hypo->setText(hypothesis);
+  });
+  populateDefaultList();
+  updateKeywords();
 }
 
 MainWindow::~MainWindow()
@@ -22,25 +21,62 @@ MainWindow::~MainWindow()
   delete ui;
 }
 
+void MainWindow::populateDefaultList()
+{
+  QStringList a;
+  a << "open menu";
+  a << "reload my gun";
+  a << "show inventory";
+  a << "quick save";
+
+  for(auto string : a)
+  {
+    QListWidgetItem * nItem = new QListWidgetItem;
+    nItem->setText(string);
+    ui->listWidget->insertItem(0, nItem);
+  }
+}
+
 
 void MainWindow::on_pushButton_clicked()
 {
-//  CSR->startDebug();
-  QStringList a;
-  a << "say hello";
-  a << "open quests";
-  CSR->loadKeywords(a);
+  bListening = !bListening;
+
+  if(bListening)
+  {
+    ui->pushButton->setText("Stop Listening");
+    QtSR->startListening();
+  }
+  else
+  {
+    ui->pushButton->setText("Start Listening");
+    QtSR->stopListening();
+  }
 }
 
 void MainWindow::on_pushButton_2_clicked()
 {
-//  CSR->stopDebug();
+  for(auto item : ui->listWidget->selectedItems())
+    ui->listWidget->removeItemWidget(item);
+
+  updateKeywords();
 }
 
-void MainWindow::debugMicLevel(float avg)
+void MainWindow::on_lineEdit_returnPressed()
 {
-  ui->plainTextEdit->setPlainText(ui->plainTextEdit->toPlainText().append("\n").append(QString::number(avg)));
-  ui->plainTextEdit->ensureCursorVisible();
-  QScrollBar * sb = ui->plainTextEdit->verticalScrollBar();
-  sb->setValue(sb->maximum());
+  QListWidgetItem * nItem = new QListWidgetItem;
+  nItem->setText(ui->lineEdit->text());
+  ui->listWidget->insertItem(0, nItem);
+  ui->lineEdit->clear();
+  updateKeywords();
+}
+
+void MainWindow::updateKeywords()
+{
+  QStringList keywords;
+
+  for(int i = 0; i < ui->listWidget->count(); ++i)
+    keywords << ui->listWidget->item(i)->text();
+
+  QtSR->loadKeywords(keywords);
 }

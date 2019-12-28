@@ -29,6 +29,11 @@ QtSpeechRecognition::~QtSpeechRecognition()
 
 void QtSpeechRecognition::loadKeywords(QStringList list)
 {
+  bool bResume = m_audioInfo->isListening();
+
+  if(bResume)
+    stopListening();
+
   // TODO: change threshold away from 1e-1?
   b_ps_utt(false);                          // then mark the end of the utterance
   ad_stop_rec(AudioRecorder);
@@ -40,6 +45,9 @@ void QtSpeechRecognition::loadKeywords(QStringList list)
   // from file.
   ps_set_kws_mem(SphinxDecoder, "default", phrases.toLocal8Bit().data());
   ps_set_search(SphinxDecoder, "default");
+
+  if(bResume)
+    startListening();
 }
 
 void QtSpeechRecognition::startListening()
@@ -50,6 +58,11 @@ void QtSpeechRecognition::startListening()
 
 void QtSpeechRecognition::stopListening()
 {
+  MicrophoneListener->stop();
+  b_ps_utt(false);                          // then mark the end of the utterance
+  ad_stop_rec(AudioRecorder);                         // stop recording
+  bFinalHypothesis = false;
+  bListening = false;
   m_audioInfo->stop();
   m_audioInput->stop();
 }
@@ -99,7 +112,7 @@ void QtSpeechRecognition::decodeMicrophone()
 
 void QtSpeechRecognition::decodeSpeech()
 {
-  int k = ad_read(AudioRecorder, AudioBuffer, 2048);                // capture the number of frames in the audio buffer
+  int k = ad_read(AudioRecorder, AudioBuffer, 4096);                // capture the number of frames in the audio buffer
   ps_process_raw(SphinxDecoder, AudioBuffer, k, FALSE, FALSE);  // send the audio buffer to the pocketsphinx decoder
 
   if(ps_get_in_speech(SphinxDecoder) && !bListening && !bFinalHypothesis)            // test to see if speech is being detected

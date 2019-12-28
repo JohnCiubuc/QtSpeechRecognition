@@ -22,15 +22,19 @@ public:
   MainWindow(QWidget * parent = nullptr);
   ~MainWindow();
 
+  void populateDefaultList();
 private slots:
   void on_pushButton_clicked();
 
   void on_pushButton_2_clicked();
 
-  void debugMicLevel(float);
+  void on_lineEdit_returnPressed();
+
+  void updateKeywords();
 
 private:
   Ui::MainWindow * ui;
-  QtSpeechRecognition * CSR;
+  QtSpeechRecognition * QtSR;
+  bool bListening = false;
 };
 #endif // MAINWINDOW_H
