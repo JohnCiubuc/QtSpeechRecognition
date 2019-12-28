@@ -62,29 +62,15 @@ void QtSpeechRecognition::stopDebug()
 
 void QtSpeechRecognition::loadKeywords(QStringList list)
 {
-  db b_ps_utt(false);                          // then mark the end of the utterance
-  db ad_stop_rec(AudioRecorder);
-  db ps_unset_search(SphinxDecoder, "default");
-  // Temporary solution
-  // Temp fix 1: Write to tmp directory instead
-  // Perma fix later: change ps_set_kws in pocketsphinx to accept buffers/lists
-  char * test = "open menu/1e-1/\nclose menu/1e-1/";
-  db ps_set_kws_mem(SphinxDecoder, "default", test);
-//  return;
-  QFile myFile("output.raw");
-  myFile.open(QIODevice::WriteOnly);
-  QTextStream os(&myFile);
-
-  for (auto s : list)
-    os << s << "/1e-1/\n";
-
-//  os << "open menu /1e-1/\nselect next target /1e-1/\nactivate jump /1e-1/\nup /1e-1/";
-  myFile.close();
-  //  int fileHandle = myFile.handle();
-  //  FILE * fh = fdopen(fileHandle, "rb");
-//  db ps_set_kws(SphinxDecoder, "default", "output.raw");
-  db ps_set_kws_mem(SphinxDecoder, "default", test);
-  db ps_set_search(SphinxDecoder, "default");
+  b_ps_utt(false);                          // then mark the end of the utterance
+  ad_stop_rec(AudioRecorder);
+  ps_unset_search(SphinxDecoder, "default");
+  // Requires pocketsphinx_qt.patch applied in pocketsphinx directory, and recompiled
+  QString phrases = list.join("/1e-1/\n");
+  phrases.append("/1e-1/");
+  qDebug() << "TEST OUT: " << phrases.toLocal8Bit().data();
+  ps_set_kws_mem(SphinxDecoder, "default", phrases.toLocal8Bit().data());
+  ps_set_search(SphinxDecoder, "default");
 }
 
 void QtSpeechRecognition::startListening()

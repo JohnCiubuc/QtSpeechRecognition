@@ -12,16 +12,8 @@ diff -Naru ./include/ps_search.h ../New/include/ps_search.h
   * Adds new keyphrase to spot
 diff -Naru ./src/libpocketsphinx/kws_search.c ../New/src/libpocketsphinx/kws_search.c
 --- ./src/libpocketsphinx/kws_search.c	2019-12-27 18:58:42.115146546 -0700
-+++ ../New/src/libpocketsphinx/kws_search.c	2019-12-27 20:01:58.520593000 -0700
-@@ -362,6 +362,7 @@
-         }
- 
-         keyphrase->word = ckd_salloc(line);
-+        E_INFO("KWS Original Add Word %f\n", keyphrase->word);
- 
-         kwss->keyphrases = glist_add_ptr(kwss->keyphrases, keyphrase);
-     }
-@@ -370,10 +371,68 @@
++++ ../New/src/libpocketsphinx/kws_search.c	2019-12-27 20:55:52.163243000 -0700
+@@ -370,10 +370,72 @@
      return 0;
  }
  
@@ -37,22 +29,30 @@ diff -Naru ./src/libpocketsphinx/kws_search.c ../New/src/libpocketsphinx/kws_sea
 +    int iterator = 0;
 +    int buf_size = 0;
 +    int iterator_start=0;
++    int first_done = 0;
 +    while(1)
 +    {
++        iterator++;
++        buf_size++;
++//        if(keystream[iterator] == '/' ) counter++;
 +        if(keystream[iterator] == '\n' || keystream[iterator] == '\0')
 +        {
-+            size_t begin, end;
++            size_t begin=0, end=0;
 +            kws_keyphrase_t *keyphrase;
 +            keyphrase = ckd_calloc(1, sizeof(kws_keyphrase_t));
-+            line = malloc(sizeof(char*) * (buf_size+1));
-+            for(int i = 0; i < buf_size+1; ++i)
-+                line[i] = keystream[iterator_start+i];
++
++            if(first_done)
++                buf_size--;
++
++            line = malloc(sizeof(char*) * (buf_size));
++            for(int i = 0; i < buf_size; ++i)
++                line[i] = keystream[ first_done ?
++                             iterator_start+i+1 :
++                             iterator_start+i];
++
 +
 +            line[buf_size] = '\0';
-+            E_INFO("Loading KWS FROM MEM: %s\n", line);
-+            iterator_start = iterator+1;
-+            buf_size = 0;
-+            end = strlen(line) - 1;
++            end = buf_size-1;
 +            begin = end - 1;
 +            if (line[end] == '/') {
 +                while (line[begin] != '/' && begin > 0)
@@ -61,22 +61,18 @@ diff -Naru ./src/libpocketsphinx/kws_search.c ../New/src/libpocketsphinx/kws_sea
 +                line[begin] = 0;
 +                keyphrase->threshold = (int32) logmath_log(kwss->base.acmod->lmath, atof_c(line + begin + 1))
 +                                              >> SENSCR_SHIFT;
-+
-+                E_INFO("KWS LOG MATH %f\n", atof_c(line + begin + 1));
 +            } else {
 +                keyphrase->threshold = kwss->def_threshold;
-+                E_INFO("KWS def Threshold %f\n", kwss->def_threshold);
-+
 +            }
 +
 +            keyphrase->word = ckd_salloc(line);
-+            E_INFO("KWS Add Word %f\n", keyphrase->word);
 +
 +            kwss->keyphrases = glist_add_ptr(kwss->keyphrases, keyphrase);
-+            if(keystream[iterator] == '\0') break;
++            if(keystream[iterator] == '\0') return 0;
++            if(!first_done) first_done = 1;
++            iterator_start = iterator;
++            buf_size = 0;
 +        }
-+        iterator++;
-+        buf_size++;
 +    }
 +
 +    return 0;
@@ -90,7 +86,7 @@ diff -Naru ./src/libpocketsphinx/kws_search.c ../New/src/libpocketsphinx/kws_sea
                  cmd_ln_t * config,
                  acmod_t * acmod, dict_t * dict, dict2pid_t * d2p)
  {
-@@ -411,12 +470,19 @@
+@@ -411,12 +473,19 @@
  	    kws_search_free(ps_search_base(kwss));
  	    return NULL;
  	}
@@ -111,7 +107,7 @@ diff -Naru ./src/libpocketsphinx/kws_search.c ../New/src/libpocketsphinx/kws_sea
  
      /* Reinit for provided keyphrase */
      if (kws_search_reinit(ps_search_base(kwss),
-@@ -431,6 +497,7 @@
+@@ -431,6 +500,7 @@
      return ps_search_base(kwss);
  }
  
