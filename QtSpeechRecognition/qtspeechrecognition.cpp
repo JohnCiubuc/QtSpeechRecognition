@@ -3,6 +3,10 @@
 QtSpeechRecognition::QtSpeechRecognition(float micThreshold)
 {
   fMicThreshold = micThreshold;
+  MicrophoneTimer = new QTimer(this);
+  connect(MicrophoneTimer, &QTimer::timeout, this, &QtSpeechRecognition::decodeMicrophone);
+  MicrophoneListener = new QTimer(this);
+  connect(MicrophoneListener, &QTimer::timeout, this, &QtSpeechRecognition::decodeSpeech);
   QString MODELDIR = QDir::currentPath().append("/model");
   Config = cmd_ln_init(NULL, ps_args(), TRUE,
                        "-hmm", (MODELDIR + "/en-us/en-us").toLocal8Bit().data(),
@@ -10,26 +14,8 @@ QtSpeechRecognition::QtSpeechRecognition(float micThreshold)
                        "-dict", (MODELDIR + "/en-us/cmudict-en-us.dict").toLocal8Bit().data(),
 //                       "-logfn", "/dev/null",                                      // suppress log info from being sent to screen
                        NULL);
-
-  if (Config == NULL)
-  {
-    fprintf(stderr, "Failed to create config object, see log for details\n");
-    return ;
-  }
-
   SphinxDecoder = ps_init(Config);
-
-  if (SphinxDecoder == NULL)
-  {
-    fprintf(stderr, "Failed to create recognizer, see log for details\n");
-    return ;
-  }
-
   AudioRecorder = ad_open();
-  MicrophoneTimer = new QTimer(this);
-  connect(MicrophoneTimer, &QTimer::timeout, this, &QtSpeechRecognition::decodeMicrophone);
-  MicrophoneListener = new QTimer(this);
-  connect(MicrophoneListener, &QTimer::timeout, this, &QtSpeechRecognition::decodeSpeech);
   // Initiliaze Audio / Mic to determine Mic Levels
   initializeAudio(QAudioDeviceInfo::defaultInputDevice());
 }
