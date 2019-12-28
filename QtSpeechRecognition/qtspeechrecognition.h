@@ -21,13 +21,12 @@ class QTSPEECHRECOGNITION_EXPORT QtSpeechRecognition: public QObject
   Q_OBJECT
 signals:
   void debugMicLevel(float);
-  void hypothesisResult(QString);
+  void firstHypothesis(QString);
+  void finalHypothesis(QString);
 public:
   QtSpeechRecognition(float micThreshold);
   ~QtSpeechRecognition();
 public slots:
-  void startDebug();
-  void stopDebug();
   void loadKeywords(QStringList list);
   void startListening();
   void stopListening();
@@ -46,6 +45,7 @@ private slots:
   void initializeAudio(const QAudioDeviceInfo & deviceInfo);
   void listenMicrophoneAudioLevel();
   int b_ps_utt(bool);
+  QString getHypothesis();
 private:
 
   AudioInfo * m_audioInfo;
@@ -61,7 +61,7 @@ private:
   int16 AudioBuffer[4096];
 
   bool bListening = false;
-  bool bHypothesisProcess = false;
+  bool bFinalHypothesis = false;
   bool bAllowListening = true;
   bool bStartUtt = false;
 

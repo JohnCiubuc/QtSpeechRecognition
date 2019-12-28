@@ -25,7 +25,6 @@ QtSpeechRecognition::QtSpeechRecognition(float micThreshold)
     return ;
   }
 
-  // Platform Specific!!
   AudioRecorder = ad_open();
   MicrophoneTimer = new QTimer(this);
   connect(MicrophoneTimer, &QTimer::timeout, this, &QtSpeechRecognition::decodeMicrophone);
@@ -42,33 +41,16 @@ QtSpeechRecognition::~QtSpeechRecognition()
   cmd_ln_free_r(Config);
 }
 
-void QtSpeechRecognition::startDebug()
-{
-  debugbStartCounter = true;
-  debugCounter = 0;
-  micTotal.clear();
-  db ps_set_search(SphinxDecoder, "test");
-}
-
-void QtSpeechRecognition::stopDebug()
-{
-  debugbStartCounter = false;
-  db b_ps_utt(false);                          // then mark the end of the utterance
-  db ad_stop_rec(AudioRecorder);
-  db ps_unset_search(SphinxDecoder, "test");
-  db ps_set_kws(SphinxDecoder, "test2", "output2.raw");
-  db ps_set_search(SphinxDecoder, "test2");
-}
-
 void QtSpeechRecognition::loadKeywords(QStringList list)
 {
   b_ps_utt(false);                          // then mark the end of the utterance
   ad_stop_rec(AudioRecorder);
   ps_unset_search(SphinxDecoder, "default");
-  // Requires pocketsphinx_qt.patch applied in pocketsphinx directory, and recompiled
   QString phrases = list.join("/1e-1/\n");
   phrases.append("/1e-1/");
-  qDebug() << "TEST OUT: " << phrases.toLocal8Bit().data();
+  // Requires pocketsphinx_qt.patch applied in pocketsphinx directory, and recompiled
+  // If patch is not being used, use ps_set_kws instead. Write keywords to file and read
+  // from file.
   ps_set_kws_mem(SphinxDecoder, "default", phrases.toLocal8Bit().data());
   ps_set_search(SphinxDecoder, "default");
 }
@@ -93,116 +75,83 @@ int QtSpeechRecognition::b_ps_utt(bool b)
   return b ? ps_start_utt(SphinxDecoder) : ps_end_utt(SphinxDecoder);
 }
 
+QString QtSpeechRecognition::getHypothesis()
+{
+  // stop recording
+  int32 start = 0;
+  ps_seg_t * iter = ps_seg_iter(SphinxDecoder);
+  float highConfidence = 0;
+  QString hypothesis;
+
+  while (iter != NULL)
+  {
+    int32 sf, ef, pprob;
+    float conf1;
+    ps_seg_frames(iter, &sf, &ef);
+    pprob = ps_seg_prob(iter, NULL, NULL, NULL);
+    conf1 = logmath_exp(ps_get_logmath(SphinxDecoder), pprob);
+    db ps_seg_word(iter) << ", " << (sf + start) / 100.0 << ", " << (ef + start) / 100.0 << ", " << conf1;
+
+    if(conf1 > highConfidence)
+    {
+      highConfidence = conf1;
+      hypothesis = QString( ps_seg_word(iter));
+    }
+
+    iter = ps_seg_next(iter);
+  }
+
+  return hypothesis;
+}
+
 void QtSpeechRecognition::decodeMicrophone()
 {
   b_ps_utt(true);
   ad_start_rec(AudioRecorder);
-//  bool utt_started = FALSE;                             // clear the utt_started flag
   bListening = false;
-  bHypothesisProcess = false;
-  MicrophoneListener->start(1);
-//  db "Decode Microphone Init";
-//  while(1)
-//  {
-//  }
+  MicrophoneListener->start(5);
 }
 
 void QtSpeechRecognition::decodeSpeech()
 {
-//  db "Decode Speech";
   int k = ad_read(AudioRecorder, AudioBuffer, 2048);                // capture the number of frames in the audio buffer
   ps_process_raw(SphinxDecoder, AudioBuffer, k, FALSE, FALSE);  // send the audio buffer to the pocketsphinx decoder
 
-  if(ps_get_in_speech(SphinxDecoder) && !bListening)            // test to see if speech is being detected
+  if(ps_get_in_speech(SphinxDecoder) && !bListening && !bFinalHypothesis)            // test to see if speech is being detected
   {
-//    db "Start Listening";
     bListening = true;
-    bHypothesisProcess = true;
-//    MicrophoneTimer->stop();
-//    MicrophoneListener->start(10);
+    bFinalHypothesis = true;
   }
 
+  // Hypothesis during speech
   if(bListening)
   {
-    // stop recording
-    int32 start = 0;
-    ps_seg_t * iter = ps_seg_iter(SphinxDecoder);
-    float highConfidence = 0;
-    QString hypothesis;
+    QString hypothesis = getHypothesis();
 
-    while (iter != NULL)
+    if(!hypothesis.isEmpty())
     {
-      int32 sf, ef, pprob;
-      float conf1;
-      ps_seg_frames(iter, &sf, &ef);
-      pprob = ps_seg_prob(iter, NULL, NULL, NULL);
-      conf1 = logmath_exp(ps_get_logmath(SphinxDecoder), pprob);
-      //      printf("%s %f %f %f\n", ps_seg_word(iter), (sf + start) / 100.0, (ef + start) / 100.0, conf1);
-      db ps_seg_word(iter) << ", " << (sf + start) / 100.0 << ", " << (ef + start) / 100.0 << ", " << conf1;
-
-      if(conf1 > highConfidence)
-      {
-        highConfidence = conf1;
-        hypothesis = QString( ps_seg_word(iter));
-      }
-
-      iter = ps_seg_next(iter);
+      bListening = false;
+      db "Quick Hypo: " << hypothesis;
+      emit firstHypothesis(hypothesis);
+      return;
     }
+  }
+
+  // Hypothesis after speech is done
+  if(!ps_get_in_speech(SphinxDecoder) && bFinalHypothesis)
+  {
+    QString hypothesis = getHypothesis();
 
     if(!hypothesis.isEmpty())
     {
       MicrophoneListener->stop();
       b_ps_utt(false);                          // then mark the end of the utterance
       ad_stop_rec(AudioRecorder);                         // stop recording
-      bListening = false;
-      bHypothesisProcess = false;
-      db "Quick Hypo: " << hypothesis;
-      emit hypothesisResult(hypothesis);
+      bFinalHypothesis = false;
+      db "Final Hypo: " << hypothesis;
+      emit finalHypothesis(hypothesis);
       return;
     }
-
-//    QString Hypothesis = QString::fromLocal8Bit(ps_get_hyp(SphinxDecoder, nullptr));             // query pocketsphinx for "hypothesis" of decoded statement
-  }
-
-  // Speech ended
-  if(!ps_get_in_speech(SphinxDecoder) && bListening)
-  {
-//    db "Stop Listening";
-    b_ps_utt(false);                          // then mark the end of the utterance
-    ad_stop_rec(AudioRecorder);                         // stop recording
-    int32 score = 0;
-    int32 start = 0;
-    ps_seg_t * iter = ps_seg_iter(SphinxDecoder);
-    float highConfidence = 0;
-    QString hypothesis;
-
-    while (iter != NULL)
-    {
-      int32 sf, ef, pprob;
-      float conf1;
-      ps_seg_frames(iter, &sf, &ef);
-      pprob = ps_seg_prob(iter, NULL, NULL, NULL);
-      conf1 = logmath_exp(ps_get_logmath(SphinxDecoder), pprob);
-//      printf("%s %f %f %f\n", ps_seg_word(iter), (sf + start) / 100.0, (ef + start) / 100.0, conf1);
-      db ps_seg_word(iter) << ", " << (sf + start) / 100.0 << ", " << (ef + start) / 100.0 << ", " << conf1;
-
-      if(conf1 > highConfidence)
-      {
-        highConfidence = conf1;
-        hypothesis = QString( ps_seg_word(iter));
-      }
-
-      iter = ps_seg_next(iter);
-    }
-
-    score = ps_get_prob(SphinxDecoder);
-//    qDebug() << this << "Score: " << score << ", Hypothesis - " << Hypothesis;
-    db "Final Hypothesis Victor: " << hypothesis;
-    emit hypothesisResult(hypothesis);
-    MicrophoneListener->stop();
-    bListening = false;
-    bHypothesisProcess = false;
-//    decodeMicrophone();
   }
 }
 
@@ -230,25 +179,6 @@ void QtSpeechRecognition::initializeAudio(const QAudioDeviceInfo & deviceInfo)
 void QtSpeechRecognition::listenMicrophoneAudioLevel()
 {
   if(!bAllowListening) return;
-
-  if(debugbStartCounter)
-  {
-    debugCounter++;
-    micTotal << m_audioInfo->level();
-
-    if(debugCounter > 10)
-    {
-      debugCounter = 0;
-      micTotal << debugCounter;
-      float tempt = 0;
-
-      for(auto value : micTotal)
-        tempt += value;
-
-      emit debugMicLevel(tempt / micTotal.size());
-      micTotal.clear();
-    }
-  }
 
   // Starts listening to Audio if Mic Level is greater than threshold
   // Generally User's voice is louder than ambient level.
