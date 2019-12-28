@@ -45,6 +45,7 @@ private slots:
   void decodeSpeech();
   void initializeAudio(const QAudioDeviceInfo & deviceInfo);
   void listenMicrophoneAudioLevel();
+  int b_ps_utt(bool);
 private:
 
   AudioInfo * m_audioInfo;
@@ -62,6 +63,7 @@ private:
   bool bListening = false;
   bool bHypothesisProcess = false;
   bool bAllowListening = true;
+  bool bStartUtt = false;
 
   float fMicThreshold;
   bool debugbStartCounter = false;

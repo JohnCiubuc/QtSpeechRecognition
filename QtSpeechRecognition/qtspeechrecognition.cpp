@@ -3,7 +3,7 @@
 QtSpeechRecognition::QtSpeechRecognition(float micThreshold)
 {
   fMicThreshold = micThreshold;
-  QString MODELDIR = "/hdd/Sync Drive/Programming Projects/QtSpeechRecognition/QtSpeechRecognition/pocketsphinx/model";
+  QString MODELDIR = QDir::currentPath().append("/model");
   Config = cmd_ln_init(NULL, ps_args(), TRUE,
                        "-hmm", (MODELDIR + "/en-us/en-us").toLocal8Bit().data(),
                        "-lm", (MODELDIR + "/en-us/en-us.lm.bin").toLocal8Bit().data(),
@@ -80,7 +80,7 @@ void QtSpeechRecognition::startDebug()
 void QtSpeechRecognition::stopDebug()
 {
   debugbStartCounter = false;
-  db ps_end_utt(SphinxDecoder);                          // then mark the end of the utterance
+  db b_ps_utt(false);                          // then mark the end of the utterance
   db ad_stop_rec(AudioRecorder);
   db ps_unset_search(SphinxDecoder, "test");
   db ps_set_kws(SphinxDecoder, "test2", "output2.raw");
@@ -89,7 +89,7 @@ void QtSpeechRecognition::stopDebug()
 
 void QtSpeechRecognition::loadKeywords(QStringList list)
 {
-  db ps_end_utt(SphinxDecoder);                          // then mark the end of the utterance
+  db b_ps_utt(false);                          // then mark the end of the utterance
   db ad_stop_rec(AudioRecorder);
   db ps_unset_search(SphinxDecoder, "default");
   // Temporary solution
@@ -122,9 +122,15 @@ void QtSpeechRecognition::stopListening()
   m_audioInput->stop();
 }
 
+int QtSpeechRecognition::b_ps_utt(bool b)
+{
+  bStartUtt = b;
+  return b ? ps_start_utt(SphinxDecoder) : ps_end_utt(SphinxDecoder);
+}
+
 void QtSpeechRecognition::decodeMicrophone()
 {
-  ps_start_utt(SphinxDecoder);
+  b_ps_utt(true);
   ad_start_rec(AudioRecorder);
 //  bool utt_started = FALSE;                             // clear the utt_started flag
   bListening = false;
@@ -181,7 +187,7 @@ void QtSpeechRecognition::decodeSpeech()
     if(!hypothesis.isEmpty())
     {
       MicrophoneListener->stop();
-      ps_end_utt(SphinxDecoder);                          // then mark the end of the utterance
+      b_ps_utt(false);                          // then mark the end of the utterance
       ad_stop_rec(AudioRecorder);                         // stop recording
       bListening = false;
       bHypothesisProcess = false;
@@ -197,7 +203,7 @@ void QtSpeechRecognition::decodeSpeech()
   if(!ps_get_in_speech(SphinxDecoder) && bListening)
   {
 //    db "Stop Listening";
-    ps_end_utt(SphinxDecoder);                          // then mark the end of the utterance
+    b_ps_utt(false);                          // then mark the end of the utterance
     ad_stop_rec(AudioRecorder);                         // stop recording
     int32 score = 0;
     int32 start = 0;
@@ -283,9 +289,6 @@ void QtSpeechRecognition::listenMicrophoneAudioLevel()
   }
 
 //  db "Audio Level: " << m_audioInfo->level();
-  if(m_audioInfo->level() > fMicThreshold && !bHypothesisProcess)
-  {
-//    bListening = true;
+  if(m_audioInfo->level() > fMicThreshold && !bStartUtt)
     decodeMicrophone();
-  }
 }
