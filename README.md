@@ -18,8 +18,8 @@ You can follow the installation from the [**CMUSphinx Tutorial**](https://cmusph
 ## Installing PocketSphinx
 1. clone https://github.com/cmusphinx/pocketsphinx
 2. copy the `pocketsphinx_qt.patch` located in the  `QtSpeechRecognition`  folder, into the `pocketsphinx` folder
-3. run `patch -p0 < pocketsphinx_qt.patch` to patch the files. 
-4. go into the `sphinxbase` folder and run `./autogen.sh`
+3. go into the `pocketsphinx` folder and run `patch -p1 < pocketsphinx_qt.patch` to patch the files. 
+4. run `./autogen.sh`
 5. `./configure` then `make` and `make install`
 
 ## Post Installation
